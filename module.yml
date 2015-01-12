@@ -1,0 +1,5 @@
+name: demo
+license: Apache 2
+author: Bart Vanbrabant <bart@impera.io>
+description: Module that provides a demonstration of Impera's capabilities. Each new demo has its
+own branch.
