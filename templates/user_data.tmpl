@@ -1,0 +1,12 @@
+#!/bin/bash
+
+curl https://impera.io/repo/impera.repo -o /etc/yum.repos.d/impera.repo
+
+yum install -y python3-impera-agent
+
+cat > /etc/impera/agent.cfg <<EOF
+{{ agent_config }}
+EOF
+
+systemctl enable impera-agent
+systemctl start impera-agent

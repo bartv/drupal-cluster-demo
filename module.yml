@@ -1,5 +1,13 @@
 name: demo
 license: Apache 2
 author: Bart Vanbrabant <bart@impera.io>
-description: Module that provides a demonstration of Impera's capabilities. Each new demo has its
-own branch.
+description: Module that provides a demonstration of Impera's capabilities. Each new demo has its own branch.
+version: 0.1b1
+source: git@github.com:bartv/imp-demo
+requires:
+    redhat: git@github.com:bartv/imp-redhat, ">= 0.1"
+    vm: git@github.com:bartv/imp-vm, ">= 0.1"
+    impera: git@github.com:bartv/imp-imp, ">= 0.1"
+    hosts: git@github.com:bartv/imp-hosts, ">= 0.1"
+    aws: git@github.com:bartv/imp-aws, ">= 0.1"
+    drupal: git@github.com:bartv/imp-drupal, ">= 0.1"

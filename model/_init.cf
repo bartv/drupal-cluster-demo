@@ -1,0 +1,126 @@
+"""
+    Copyright 2015 Impera
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+    Contact: bart@impera.io
+"""
+
+implementation vmUserData for impera::Agent:
+    agent_config = std::template("impera/agent-config.tmpl")
+    self.host.user_data = std::template("demo/user_data.tmpl")
+end
+
+implement impera::Agent using vmUserData
+
+entity ManagedCluster:
+    """
+        A cluster of Impera managed servers
+    """
+    std::hoststring domainname
+end
+
+implement ManagedCluster using cluster
+
+implementation cluster for ManagedCluster:
+    self.host_list = hosts::List(domainname=domainname)
+end
+
+hosts::List host_list [1] -- [0:1] ManagedCluster impera_cluster
+
+vm::Host managed_hosts [0:] -- [0:1] ManagedCluster impera_cluster
+vm::Host mgmt_host [1] -- [0:1] ManagedCluster impera_cluster_master
+impera::Server impera_server [1] -- [0:1] ManagedCluster impera_cluster
+DrupalCluster drupal_cluster [0:] -- [1] ManagedCluster impera_cluster
+vm::IaaS iaas [1] -- [0:] ManagedCluster impera_cluster
+
+implementation imperaMgmtHost for vm::Host:
+    # setup rabbit mq
+    rabbitmq_server = rabbitmq::Server(host=self, admin_username="admin",
+                                       admin_password=std::generate_password("rabbitmq_admin_pw"))
+    
+    mq_vhost = rabbitmq::VirtualHost(server=rabbitmq_server, name="impera")
+    user = rabbitmq::User(server=rabbitmq_server, name="impera", virtualhosts=mq_vhost,
+                          password=std::generate_password("rabbitmq_imp_pw"))
+
+    mq_connection = rabbitmq::Connection(server=rabbitmq_server, vhost=mq_vhost, user=user)
+
+    # setup mongo db
+    mongo = mongodb::MongoDB(host=self)
+
+    # create the management server
+    server = impera::Server(host=self, mq=mq_connection, mongo_server=mongo,
+                            impera_cluster=self.impera_cluster_master)
+
+    # make it part of the managed cluster as well
+    agent = impera::Agent(host=self, impera_server=server)
+    agent.names = impera::AgentName(name=self.impera_cluster_master.iaas.name)
+
+    # add it to the host list
+    self.impera_cluster_master.host_list.hosts = self
+end
+
+implement vm::Host using imperaMgmtHost when std::isset(self.impera_cluster_master)
+
+implementation imperaManagedHost for vm::Host:
+    impera::Agent(host=self, impera_server=self.impera_cluster.impera_server)
+    self.impera_cluster.host_list.hosts = self
+end
+
+implement vm::Host using imperaManagedHost when std::isset(self.impera_cluster)
+
+DrupalCluster drupal_cluster [0:1] -- [1] mysql::Database database
+
+entity DrupalCluster extends web::Cluster:
+    """
+        A cluster of application containers (webservers) that host a drupal website.
+    """
+    string admin_user
+    string admin_password
+    string admin_email
+    string site_name
+end
+
+implement DrupalCluster using clusteredDrupal
+
+implementation clusteredDrupal for DrupalCluster:
+    vm_names = vm::names("webhost-", cluster_size)   
+    
+    for vm_name in vm_names:
+        vm = vm::Host(name=vm_name, image=image.id, os=image.os, iaas=iaas, public_key=image.key,
+                      flavor="m3.medium", impera_cluster=impera_cluster)
+        
+        web_server = apache::Server(host=vm)
+    
+        app = drupal::Application(container=web_server, aliases=aliases, name=name,
+                                  admin_user=admin_user, admin_password=admin_password,
+                                  admin_email=admin_email, site_name=site_name,
+                                  database=database)
+        app.lb_app = loadbalancer
+    end
+end
+
+implementation reportELB for aws::ELB:
+    elb_dns_name = std::getfact(self, "dns_name", "none")
+    std::print("ELB instance with name {{ name }} is available at {{ elb_dns_name }}")
+end
+
+implement aws::ELB using reportELB
+
+implementation reportVarnishProxy for varnish::Proxy:
+    std::print("Varnish proxy is available at {{ public_ip }}")
+    public_ip = std::getfact(self.host, "public_ip", "none")
+end
+
+implement varnish::Proxy using reportVarnishProxy
+
