@@ -11,3 +11,4 @@ requires:
     hosts: git@github.com:impera-io/hosts, ">= 0.1"
     aws: git@github.com:impera-io/aws, ">= 0.1"
     drupal: git@github.com:impera-io/drupal, ">= 0.1"
+    openstack: git@github.com:impera-io/openstack, ">= 0.1"

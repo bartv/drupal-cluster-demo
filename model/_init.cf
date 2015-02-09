@@ -48,7 +48,7 @@ implementation imperaMgmtHost for vm::Host:
     # setup rabbit mq
     rabbitmq_server = rabbitmq::Server(host=self, admin_username="admin",
                                        admin_password=std::generate_password("rabbitmq_admin_pw"))
-    
+
     mq_vhost = rabbitmq::VirtualHost(server=rabbitmq_server, name="impera")
     user = rabbitmq::User(server=rabbitmq_server, name="impera", virtualhosts=mq_vhost,
                           password=std::generate_password("rabbitmq_imp_pw"))
@@ -89,19 +89,20 @@ entity DrupalCluster extends web::Cluster:
     string admin_password
     string admin_email
     string site_name
+    string flavor
 end
 
 implement DrupalCluster using clusteredDrupal
 
 implementation clusteredDrupal for DrupalCluster:
-    vm_names = vm::names("webhost-", cluster_size)   
-    
+    vm_names = vm::names("webhost-", cluster_size)
+
     for vm_name in vm_names:
         vm = vm::Host(name=vm_name, image=image.id, os=image.os, iaas=iaas, public_key=image.key,
-                      flavor="m3.medium", impera_cluster=impera_cluster)
-        
+                      flavor=flavor, impera_cluster=impera_cluster)
+
         web_server = apache::Server(host=vm)
-    
+
         app = drupal::Application(container=web_server, aliases=aliases, name=name,
                                   admin_user=admin_user, admin_password=admin_password,
                                   admin_email=admin_email, site_name=site_name,
